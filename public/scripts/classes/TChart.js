@@ -10,10 +10,9 @@ class TChart extends TComponent {
     this.datesLayers_ = [];
     this.lines_ = [];
     this.prevMaxY_ = -1;
-    this.deletingLines_ = [];
     this.xMark_ = null;
     this.tooltip_ = null;
-    this.theme_ = 1;
+    this.theme_ = 0;
   }
 
   initDom () {
@@ -35,10 +34,9 @@ class TChart extends TComponent {
     this.minimap_ = new TChartMinimap(0, 100);
     this.minimap_.render(minimapWorkSpace);
     this.minimap_.addEventListener('input', this.handlerMinimapInput_.bind(this));
-    this.minimap_.addEventListener('changestart', this.handlerMinimapChangeStart_.bind(this));
-    this.minimap_.addEventListener('change', this.handlerMinimapChange_.bind(this));
 
     window.addEventListener('resize', this.handlerResize_.bind(this));
+    window.addEventListener('orientationchange', this.handlerResize_.bind(this));
   }
 
   draw (data) {
@@ -140,34 +138,6 @@ class TChart extends TComponent {
     this.updateGraphScale(left, width);
   };
 
-  handlerMinimapChangeStart_ () {
-    this.yAxis.forEach((graph) => {
-      // graph.getElement().style.transition = 'none';
-      const mark = graph.getMark();
-      if (mark) mark.style.transition = 'none';
-    });
-    for (let i = 0; i < this.svgMarks_.length; i++) {
-      this.svgMarks_[i].style.transition = 'none';
-    }
-    if (this.xMark_) {
-      this.xMark_.style.transition = 'none';
-    }
-  }
-
-  handlerMinimapChange_ () {
-    this.yAxis.forEach((graph) => {
-      graph.getElement().style.transition = '';
-      const mark = graph.getMark();
-      if (mark) mark.style.transition = '';
-    });
-    for (let i = 0; i < this.svgMarks_.length; i++) {
-      this.svgMarks_[i].style.transition = '';
-    }
-    if (this.xMark_) {
-      this.xMark_.style.transition = '';
-    }
-  }
-
   updateGraphScale (left, width) {
     const itemsCount = this.xAxis.length;
     const leftOffset = left / 100 * (itemsCount - 1);
@@ -199,10 +169,16 @@ class TChart extends TComponent {
       let scaleX = 100 / width;
       let translateX = -left;
       let translateY = 0;
-      this.yAxis.forEach(graph => graph.setTransform(0, 0, scaleX, scaleY));
       this.svgPath_.style.transform = `matrix(${scaleX}, 0, 0, 1, ${translateX * scaleX}, ${translateY})`;//`translate(${translateX * scaleX}px, ${translateY * scaleY}px`;
+
+      const index = this.yAxis[0].getIndex();
+      this.yAxis.forEach((graph) => {
+        graph.setTransform(translateX, translateY, scaleX, scaleY);
+        graph.updateMark(maxVisible);
+      });
+      const x = (index / (this.xAxis.length - 1) * 100 + translateX) * scaleX;
       for (let i = 0; i < this.svgMarks_.length; i++) {
-        this.svgMarks_[i].style.transform = `matrix(${scaleX}, 0, 0, ${scaleY}, ${translateX * scaleX}, ${translateY * scaleY})`;
+        this.svgMarks_[i].style.transform = `translate(${x}px, 0px)`;
       }
 
       this.datesContainer_.style.width = 100 * scaleX + '%';
@@ -339,11 +315,21 @@ class TChart extends TComponent {
 
     const step = 1 / (this.xAxis.length - 1);
     const index = Math.round(x / step);
-    const xVal = (index * step * 100).toFixed(2);
-    this.drawXMark_(xVal);
+    this.drawXMark_();
+
+    let scaleX = 100 / width;
+    let translateX = -left;
+
     this.yAxis.forEach((graph) => {
-      graph.drawMarkAt(xVal, (graph.values[index] / this.maxY_ * 100).toFixed(2));
+      graph.createMark(index);
+      graph.disableMarkTransition();
+      graph.updateMark(this.prevMaxY_);
+      graph.enableMarkTransition();
     });
+    const markOffsetLeft = (index / (this.xAxis.length - 1) * 100 + translateX) * scaleX;
+    for (let i = 0; i < this.svgMarks_.length; i++) {
+      this.svgMarks_[i].style.transform = `translate(${markOffsetLeft}px, 0px)`;
+    }
     this.drawTooltip_(index);
   }
 
@@ -371,10 +357,12 @@ class TChart extends TComponent {
       const xVal = index * step * graphWidth;
       let l = xVal - graphLeft;
 
-      if (l < 0 || l > containerWidth) {
+      if (l < 2 || l > containerWidth - 2) {
         this.tooltip_.hide();
+        this.xMark_ && (this.xMark_.style.opacity = '0');
       } else {
         this.tooltip_.show();
+        this.xMark_ && (this.xMark_.style.opacity = '1');
         l -= 40;
         const tooltipWidth = this.tooltip_.getElement().offsetWidth;
         if (l + tooltipWidth > containerWidth) {
@@ -394,7 +382,7 @@ class TChart extends TComponent {
     }
   }
 
-  drawXMark_ (xVal) {
+  drawXMark_ () {
     if (!this.xMark_) {
       this.xMark_ = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       this.xMark_.setAttribute('class', 'tchart-xmark');
@@ -402,8 +390,6 @@ class TChart extends TComponent {
       this.xMark_.setAttribute('y2', '90');
       this.svgMarks_[0].appendChild(this.xMark_);
     }
-    this.xMark_.setAttribute('x1', xVal);
-    this.xMark_.setAttribute('x2', xVal);
   }
 
   removeXMark_ () {
