@@ -53,6 +53,7 @@ class TChart extends TComponent {
     this.minimap_.setGraphs(this.yAxis);
     this.minimap_.setMaxY(this.maxY_);
     this.createDates_();
+    this.createGraphlines();
     this.updateDatesVisibility();
     this.updateGraphLines(this.maxY_);
     this.setTheme(this.theme_);
@@ -218,17 +219,31 @@ class TChart extends TComponent {
     }
   }
 
+  createGraphlines () {
+    this.lines_ = [];
+    this.disLines_ = [];
+    for (let i=0; i< 6; i++) {
+      const line = document.createElement('div');
+      line.className = 'tchart-graph-line';
+      this.linesContainer_.appendChild(line);
+      this.lines_.push(line);
+      const disLine = document.createElement('div');
+      disLine.className = 'tchart-graph-line';
+      this.linesContainer_.appendChild(disLine);
+      this.disLines_.push(disLine);
+    }
+  }
+
   updateGraphLines (maxY) {
     if (this.prevMaxY_ === maxY) {
       return;
     }
 
     const deltaMaxY = Math.abs(maxY - this.prevMaxY_) / this.maxY_;
-
     this.prevMaxY_ = maxY;
+    const step = Math.round(maxY / 6);
 
-    if (deltaMaxY < .05) {
-      const step = Math.round(maxY / 6);
+    if (deltaMaxY < .1) {
       this.lines_.forEach((line, i) => {
         line.innerHTML = i * step;
       });
@@ -236,35 +251,25 @@ class TChart extends TComponent {
       const scale = this.maxY_ / maxY;
       this.linesContainer_.style.height = 100 * scale + '%';
 
-      if (this.deletingLines_.length) {
-        const step = Math.round(maxY / 6);
-        this.lines_.forEach((line, i) => {
-          line.innerHTML = i * step;
-          line.style.bottom = i * step / maxY * 100 / scale + '%';
-        });
-      } else {
-        this.lines_.forEach(line => {
-          line.style.opacity = '0';
-        });
-        this.deletingLines_ = this.lines_.slice();
-        setTimeout(() => {
-          this.deletingLines_.forEach(line => {
-            line.parentNode.removeChild(line);
-          });
-          this.deletingLines_ = [];
-        }, 300);
-        this.lines_ = [];
+      this.disLines_.forEach(line => {
+        line.style.opacity = '0';
+      });
 
-        const step = Math.round(maxY / 6);
-        for (let i = 0; i < 6; i += 1) {
-          const line = document.createElement('div');
-          line.className = 'tchart-graph-line';
-          line.style.bottom = i * step / maxY * 100 / scale + '%';
-          line.innerHTML = i * step;
-          this.lines_.push(line);
-          this.linesContainer_.appendChild(line);
-        }
+      this.lines_.forEach((line, i) => {
+        line.style.bottom = i * step / maxY * 100 / scale + '%';
+        line.style.opacity = '1';
+        line.innerHTML = i * step;
+      });
+
+      if (this.timerSwitchLines_) {
+        clearInterval(this.timerSwitchLines_);
       }
+      this.timerSwitchLines_ = setTimeout(() => {
+        const disLines = this.disLines_;
+        this.disLines_ = this.lines_;
+        this.lines_ = disLines;
+        this.timerSwitchLines_ = null;
+      }, 300);
     }
   }
 
