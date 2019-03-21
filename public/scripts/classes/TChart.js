@@ -243,12 +243,6 @@ class TChart extends TComponent {
           line.style.bottom = i * step / maxY * 100 / scale + '%';
         });
       } else {
-        if (this.deletingLines_.length) {
-          this.deletingLines_.forEach(line => {
-            line.parentNode.removeChild(line);
-          });
-        }
-
         this.lines_.forEach(line => {
           line.style.opacity = '0';
         });
