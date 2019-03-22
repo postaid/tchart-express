@@ -1,6 +1,6 @@
 class TChart extends TComponent {
 
-  constructor () {
+  constructor (title) {
     super();
     this.svg_ = null;
     this.xAxis = null;
@@ -13,6 +13,7 @@ class TChart extends TComponent {
     this.xMark_ = null;
     this.tooltip_ = null;
     this.theme_ = 0;
+    this.title_ = title;
   }
 
   initDom () {
@@ -21,7 +22,9 @@ class TChart extends TComponent {
     this.svg_.addEventListener('mousemove', this.handlerSVGMouseMove_.bind(this));
     this.svgWorkspace_.addEventListener('mouseleave', this.handlerSVGMouseLeave_.bind(this));
     this.svgPath_ = this.svg_.getElementsByClassName('tchart-svg-path')[0];
-    this.svgMarks_ = this.svg_.getElementsByClassName('tchart-svg-mark');
+    this.svgMarks_ = this.svg_.getElementsByClassName('tchart-svg-mark')[0];
+    this.svgGraphMarks_ = this.element_.getElementsByClassName('tchart-svg-marks-move')[0];
+    this.element_.getElementsByClassName('tchart-header')[0].innerHTML = this.title_;
 
     this.toolbar_ = this.element_.getElementsByClassName('tchart-toolbar')[0];
     this.datesContainer_ = this.element_.getElementsByClassName('tchart-dates')[0];
@@ -41,8 +44,7 @@ class TChart extends TComponent {
 
   draw (data) {
     this.svgPath_.innerHTML = '';
-    this.svgMarks_[0].innerHTML = '';
-    this.svgMarks_[1].innerHTML = '';
+    this.svgMarks_.innerHTML = '';
     this.parseColumns_(data);
     this.yAxis.forEach((graph) => {
       TChart.drawGraph(graph, this.maxY_);
@@ -122,9 +124,8 @@ class TChart extends TComponent {
       } else if (colType === 'line') {
         const graph = new TGraph(colId, data.names[colId], data.colors[colId], colData);
         graph.render(this.svgPath_);
-        graph.setMarkContainer(this.svgMarks_[1]);
+        graph.setMarkContainer(this.svgGraphMarks_);
         graph.setTransform(0, 0, 1, 1);
-        graph.setAspectRatio(ratio);
         yAxis.push(graph);
         this.maxY_ = Math.max(this.maxY_, graph.max);
       }
@@ -169,7 +170,7 @@ class TChart extends TComponent {
       let scaleX = 100 / width;
       let translateX = -left;
       let translateY = 0;
-      this.svgPath_.style.transform = `matrix(${scaleX}, 0, 0, 1, ${translateX * scaleX}, ${translateY})`;//`translate(${translateX * scaleX}px, ${translateY * scaleY}px`;
+      this.svgPath_.style.transform = `matrix(${scaleX}, 0, 0, 1, ${translateX * scaleX}, ${translateY})`;
 
       const index = this.yAxis[0].getIndex();
       this.yAxis.forEach((graph) => {
@@ -177,9 +178,8 @@ class TChart extends TComponent {
         graph.updateMark(maxVisible);
       });
       const x = (index / (this.xAxis.length - 1) * 100 + translateX) * scaleX;
-      for (let i = 0; i < this.svgMarks_.length; i++) {
-        this.svgMarks_[i].style.transform = `translate(${x}px, 0px)`;
-      }
+      this.svgMarks_.style.transform = `translate(${x}px, 0px)`;
+      this.svgGraphMarks_.style.transform = `translate(${x}%, 0%)`;
 
       this.datesContainer_.style.width = 100 * scaleX + '%';
       this.datesContainer_.style.transform = `translate(${translateX}%, 0)`;
@@ -327,9 +327,8 @@ class TChart extends TComponent {
       graph.enableMarkTransition();
     });
     const markOffsetLeft = (index / (this.xAxis.length - 1) * 100 + translateX) * scaleX;
-    for (let i = 0; i < this.svgMarks_.length; i++) {
-      this.svgMarks_[i].style.transform = `translate(${markOffsetLeft}px, 0px)`;
-    }
+    this.svgMarks_.style.transform = `translate(${markOffsetLeft}px, 0px)`;
+    this.svgGraphMarks_.style.transform = `translate(${markOffsetLeft}%, 0%)`;
     this.drawTooltip_(index);
   }
 
@@ -343,8 +342,10 @@ class TChart extends TComponent {
 
   updateTooltip_ (index, left, width) {
     if (this.tooltip_) {
-      this.tooltip_.setDate(this.xAxis[index]);
-      this.tooltip_.setValues(this.yAxis, index);
+      if (this.tooltip_.getIndex() !== index) {
+        this.tooltip_.setDate(this.xAxis[index]);
+        this.tooltip_.setValues(this.yAxis, index);
+      }
 
       const containerWidth = this.svgWorkspace_.offsetWidth;
       const position = this.minimap_.getPosition();
@@ -388,13 +389,13 @@ class TChart extends TComponent {
       this.xMark_.setAttribute('class', 'tchart-xmark');
       this.xMark_.setAttribute('y1', '-5');
       this.xMark_.setAttribute('y2', '90');
-      this.svgMarks_[0].appendChild(this.xMark_);
+      this.svgMarks_.appendChild(this.xMark_);
     }
   }
 
   removeXMark_ () {
     if (this.xMark_) {
-      this.svgMarks_[0].removeChild(this.xMark_);
+      this.svgMarks_.removeChild(this.xMark_);
       this.xMark_ = null;
     }
   }
@@ -406,8 +407,6 @@ class TChart extends TComponent {
   }
 
   handlerResize_ () {
-    const ratio = this.svg_.clientHeight / this.svg_.clientWidth;
-    this.yAxis.forEach(graph => graph.setAspectRatio(ratio));
     this.updateDatesVisibility();
     if (this.tooltip_) {
       const index = this.tooltip_.getIndex();
@@ -454,14 +453,17 @@ TChart.THEMES = [
 
 TChart.TEMPLATE = `
 <div class="tchart-container">
-  <div class="tchart-header">Followers</div>
+  <div class="tchart-header"></div>
   <div class="tchart-svg-workspace">
     <div class="tchart-graph-lines"></div>
-    <svg class="tchart-svg" version="1.1" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" viewBox="0 -1 100 105" stroke-width="2" stroke-linejoin="round">
+    <svg class="tchart-svg" version="1.1" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" viewBox="0 0 100 100" stroke-width="2" stroke-linejoin="round">
       <g class="tchart-svg-mark"></g>
       <g class="tchart-svg-path"></g>
       <g class="tchart-svg-mark"></g>
     </svg>
+    <svg class="tchart-svg-marks" version="1.1" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+      <g class="tchart-svg-marks-move"></g>
+    </svg>  
   </div>
   <div class="tchart-dates"></div>
   <div class="tchart-minimap-workspace"></div>

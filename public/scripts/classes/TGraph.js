@@ -10,13 +10,10 @@ class TGraph extends TComponent {
     this.max = Math.max.apply(null, values);
     this.visible_ = true;
     this.mark_ = null;
-    this.ratio_ = 1;
     this.scale_ = [1, 1];
     this.translate_ = [0, 0];
     this.index_ = -1;
-    this.maxDrawY_ = 0;
     this.markContainer_ = null;
-    this.markRadius_ = 8;
   }
 
   renderTemplate (container, template) {
@@ -70,9 +67,8 @@ class TGraph extends TComponent {
       this.mark_.setAttribute('class', 'tchart-graph-mark');
       this.mark_.setAttribute('stroke', this.color);
       this.markContainer_.appendChild(this.mark_);
-      this.markRadius_ = parseFloat(window.getComputedStyle(this.mark_).borderTopLeftRadius);
       this.mark_.style.transformOrigin = '0px 0px';
-      this.mark_.setAttribute('r', this.markRadius_ / this.element_.viewportElement.clientHeight * 100);
+      this.mark_.setAttribute('r', '0.3em');
       this.enableMarkTransition();
     }
     this.index_ = index;
@@ -82,12 +78,10 @@ class TGraph extends TComponent {
   }
 
   updateMark (maxY) {
-    if (!this.mark_) {
-      return;
+    if (this.mark_) {
+      const y = this.values[this.index_] / maxY * 100;
+      this.mark_.style.transform = `translate(0%, ${y}%)`;
     }
-    this.maxDrawY_ = maxY;
-    const y = this.values[this.index_] / maxY * 100;
-    this.mark_.style.transform = `translate(0, ${y}px) scale(${this.ratio_}, 1)`;
   }
 
   removeMark () {
@@ -100,14 +94,6 @@ class TGraph extends TComponent {
   showMark (value) {
     if (this.mark_) {
       this.mark_.style.opacity = value ? '1' : '0';
-    }
-  }
-
-  setAspectRatio (ratio) {
-    this.ratio_ = ratio;
-    if (this.mark_) {
-      this.mark_.style.transform = `scale(${1/this.scale_[0] * this.ratio_}, ${1/this.scale_[1]})`;
-      this.mark_.setAttribute('r', this.markRadius_ / this.element_.viewportElement.clientHeight * 100);
     }
   }
 
